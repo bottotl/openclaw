@@ -948,13 +948,13 @@ final class ChatTranscriptCacheStoreTests: ClientDatabaseTestSuite, @unchecked S
         // Exercise the previous named-column reader/writer contract through a fresh connection.
         // A full older-app migration/open remains a separate native downgrade proof.
         let legacy = try DatabaseQueue(path: directory.appendingPathComponent("client-state.sqlite").path)
-        let owner = try legacy.read { db in
-            try Row.fetchOne(db, sql: """
-                SELECT scope, main_session_key, default_agent_id
+        let defaultAgentID = try await legacy.read { db in
+            try String.fetchOne(db, sql: """
+                SELECT default_agent_id
                 FROM gateway_routing_identity WHERE gateway_id = 'gw-a'
                 """)
         }
-        #expect((owner?["default_agent_id"] as String?) == "main")
+        #expect(defaultAgentID == "main")
         try await legacy.write { db in
             try db.execute(
                 sql: """
