@@ -14,10 +14,16 @@ import {
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { normalizeAgentId, normalizeMainKey } from "../routing/session-key.js";
 import type { GatewayAgentKind } from "../shared/session-types.js";
+import {
+  readAgentDatabaseAdmissionRefusal,
+  type AgentDatabaseAdmissionRefusal,
+} from "../state/agent-database-admission.js";
 import { SYSTEM_AGENT_ROSTER_ENTRIES } from "../system-agent/agent-id.js";
 
 type GatewayAgentListRow = {
   id: string;
+  status?: "degraded";
+  admissionRefusal?: AgentDatabaseAdmissionRefusal;
   kind?: GatewayAgentKind;
   name?: string;
 };
@@ -159,14 +165,22 @@ export function listGatewayAgentsBasic(cfg: OpenClawConfig): GatewayAgentSelecti
     orderedIds.push(mainKey);
   }
 
-  const agents: GatewayAgentListRow[] = orderedIds.map((id) => ({
-    id,
-    kind:
-      !configuredById.has(id) && diskIds.has(id)
-        ? (ownerEntries.get(id)?.kind ?? "agent")
-        : "agent",
-    name: configuredById.get(id),
-  }));
+  const agents: GatewayAgentListRow[] = orderedIds.map((id) => {
+    const admissionRefusal = readAgentDatabaseAdmissionRefusal(id);
+    const agent: GatewayAgentListRow = {
+      id,
+      kind:
+        !configuredById.has(id) && diskIds.has(id)
+          ? (ownerEntries.get(id)?.kind ?? "agent")
+          : "agent",
+      name: configuredById.get(id),
+    };
+    if (admissionRefusal) {
+      agent.status = "degraded";
+      agent.admissionRefusal = admissionRefusal;
+    }
+    return agent;
+  });
   return {
     ...selection,
     sessionRoutingContract: resolveSessionRoutingContract(cfg),
